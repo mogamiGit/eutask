@@ -122,3 +122,73 @@ export const addHabit = (
     habit,
   });
 };
+
+/** The same database with one habit replaced. The original is left untouched. */
+const withHabit = (db: Database, habit: Habit): Database => ({
+  ...db,
+  habits: db.habits.map((each) => (each.id === habit.id ? habit : each)),
+});
+
+/**
+ * RF-2: marks today as fulfilled. Idempotent: when the mark was already there the very same
+ * database comes back with `alreadyMarked`, so nothing is written and the caller still gets
+ * the streak in force (RF-2.2).
+ */
+export const markDone = (
+  db: Database,
+  id: number,
+  today: IsoDate,
+): Result<{ db: Database; habit: Habit; streak: number; alreadyMarked: boolean }> => {
+  const current = db.habits.find((each) => each.id === id);
+  if (current === undefined) return fail('HABIT_NOT_FOUND');
+
+  if (current.marks.includes(today)) {
+    return ok({
+      db,
+      habit: current,
+      streak: computeStreak(current.marks, today),
+      alreadyMarked: true,
+    });
+  }
+
+  // 'YYYY-MM-DD' sorts alphabetically in chronological order, so the default comparator holds.
+  const habit: Habit = { ...current, marks: [...current.marks, today].sort() };
+
+  return ok({
+    db: withHabit(db, habit),
+    habit,
+    streak: computeStreak(habit.marks, today),
+    alreadyMarked: false,
+  });
+};
+
+/**
+ * RF-7: withdraws the mark of today and only that one, so the previous days stay put
+ * (RF-7.1). Idempotent as well: with no mark for today nothing changes (RF-7.2).
+ */
+export const markUndone = (
+  db: Database,
+  id: number,
+  today: IsoDate,
+): Result<{ db: Database; habit: Habit; streak: number; wasNotMarked: boolean }> => {
+  const current = db.habits.find((each) => each.id === id);
+  if (current === undefined) return fail('HABIT_NOT_FOUND');
+
+  if (!current.marks.includes(today)) {
+    return ok({
+      db,
+      habit: current,
+      streak: computeStreak(current.marks, today),
+      wasNotMarked: true,
+    });
+  }
+
+  const habit: Habit = { ...current, marks: current.marks.filter((mark) => mark !== today) };
+
+  return ok({
+    db: withHabit(db, habit),
+    habit,
+    streak: computeStreak(habit.marks, today),
+    wasNotMarked: false,
+  });
+};
