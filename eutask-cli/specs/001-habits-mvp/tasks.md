@@ -24,7 +24,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: guardar y releer da lo mismo, JSON a 2 espacios y sin `.tmp` residual.
 - [x] T10. output.ts: mensajes en español y tabla de `list`. (RF-4.1, RF-4.3, RF-4.4, RNF-2)
       Hecho cuando: cada `ErrorCode` tiene texto accionable y `[x] hecho`/`[ ] pendiente` sobreviven sin ANSI.
-- [ ] T11. confirm.ts con `node:readline` e `isTTY`. (RF-6.2, RF-6.4)
+- [x] T11. confirm.ts con `node:readline` e `isTTY`. (RF-6.2, RF-6.4)
       Hecho cuando: solo la respuesta afirmativa explícita devuelve `true`.
 - [ ] T12. cli.ts con commander: seis comandos, `today` local, códigos de salida. (RF-1.1, RF-3.1)
       Hecho cuando: `npm run build` y `node dist/cli.js --help` sale 0 listando los seis.
