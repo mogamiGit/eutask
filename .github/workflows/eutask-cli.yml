@@ -17,9 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      # v5 porque el runtime de Node 20 está retirado en las actions. Es la versión con la que
+      # corre la action, no la del proyecto: esa la fija `node-version`.
+      - uses: actions/setup-node@v5
         with:
           # La versión que exige `engines` en package.json.
           node-version: 20
