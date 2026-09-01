@@ -10,7 +10,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: tests de vacío, 59/60/61, control, NFC vs NFD, e ids `0`/`-1`/`007`/`1.5` en verde.
 - [x] T3. core.computeStreak con `today` inyectado. (RF-3)
       Hecho cuando: tests de sin marcas, solo hoy, viva por ayer, hueco y racha larga en verde.
-- [ ] T4. core.addHabit: id de `nextId`, duplicado exacto rechazado. (RF-1.1, RF-1.6, RF-1.7)
+- [x] T4. core.addHabit: id de `nextId`, duplicado exacto rechazado. (RF-1.1, RF-1.6, RF-1.7)
       Hecho cuando: tests de creación, duplicado, variantes por acentos y mayúsculas, y `nextId` en verde.
 - [ ] T5. core.markDone y markUndone, idempotentes. (RF-2, RF-7)
       Hecho cuando: tests de primera marca, repetida, done→undone→done y días anteriores en verde.

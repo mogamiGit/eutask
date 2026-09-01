@@ -98,3 +98,27 @@ export const computeStreak = (marks: readonly IsoDate[], today: IsoDate): number
 
   return streak;
 };
+
+/**
+ * RF-1.1: registers the habit with the id taken from `nextId` (RF-1.7) and no marks, so its
+ * streak starts at 0. RF-1.6: names are stored already trimmed and in NFC, so the duplicate
+ * check is plain string equality and keeps case and accents apart.
+ */
+export const addHabit = (
+  db: Database,
+  rawName: string,
+  today: IsoDate,
+): Result<{ db: Database; habit: Habit }> => {
+  const validated = validateName(rawName);
+  if (!validated.ok) return fail(validated.code);
+
+  const name = validated.value;
+  if (db.habits.some((each) => each.name === name)) return fail('DUPLICATE_NAME');
+
+  const habit: Habit = { id: db.nextId, name, createdAt: today, marks: [] };
+
+  return ok({
+    db: { ...db, nextId: db.nextId + 1, habits: [...db.habits, habit] },
+    habit,
+  });
+};

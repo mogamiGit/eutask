@@ -2,12 +2,14 @@ import { format, parseISO, subDays } from 'date-fns';
 import { describe, expect, it } from 'vitest';
 
 import {
+  addHabit,
   computeStreak,
   emptyDatabase,
   normalizeName,
   parseHabitId,
   validateName,
   type Database,
+  type Habit,
   type IsoDate,
 } from '../src/core.js';
 
@@ -224,5 +226,119 @@ describe('computeStreak (RF-3)', () => {
     computeStreak(marks, TODAY);
 
     expect(marks).toEqual([daysBefore(1), TODAY]);
+  });
+});
+
+describe('addHabit (RF-1.1, RF-1.6, RF-1.7)', () => {
+  // T4 — creation, duplicate rejection and never reused ids.
+  const TODAY = '2026-09-01';
+
+  const databaseWith = (habits: Habit[], nextId: number): Database => ({
+    version: 1,
+    nextId,
+    habits,
+  });
+
+  const habit = (id: number, name: string, marks: IsoDate[] = []): Habit => ({
+    id,
+    name,
+    createdAt: '2026-08-25',
+    marks,
+  });
+
+  it('creates the habit with no marks, so its streak starts at 0 (RF-1.1)', () => {
+    const result = addHabit(emptyDatabase(), 'Leer 20 páginas', TODAY);
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        db: { version: 1, nextId: 2, habits: [expect.anything()] },
+        habit: { id: 1, name: 'Leer 20 páginas', createdAt: TODAY, marks: [] },
+      },
+    });
+    if (!result.ok) return;
+    expect(computeStreak(result.value.habit.marks, TODAY)).toBe(0);
+    expect(result.value.db.habits).toEqual([result.value.habit]);
+  });
+
+  it('takes the id from nextId and moves it forward (RF-1.7)', () => {
+    const first = addHabit(emptyDatabase(), 'Correr 5 km', TODAY);
+    expect(first).toMatchObject({ ok: true, value: { habit: { id: 1 } } });
+    if (!first.ok) return;
+
+    const second = addHabit(first.value.db, 'Meditar', TODAY);
+    expect(second).toMatchObject({ ok: true, value: { habit: { id: 2 } } });
+    if (!second.ok) return;
+
+    expect(second.value.db.nextId).toBe(3);
+    expect(second.value.db.habits.map((each) => each.id)).toEqual([1, 2]);
+  });
+
+  it('never reuses the id of a removed habit (RF-1.7)', () => {
+    // Habit 3 is gone but nextId stayed at 4, as removing does not touch it.
+    const db = databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')], 4);
+
+    expect(addHabit(db, 'Leer 20 páginas', TODAY)).toMatchObject({
+      ok: true,
+      value: { db: { nextId: 5 }, habit: { id: 4 } },
+    });
+  });
+
+  it('stores the name trimmed and normalised, and today as the creation date (RF-1.2)', () => {
+    expect(addHabit(emptyDatabase(), `  cafe${COMBINING_ACUTE}  `, TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { name: 'café', createdAt: TODAY } },
+    });
+  });
+
+  it('rejects an exact duplicate without registering anything (RF-1.6)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')], 2);
+
+    expect(addHabit(db, 'Correr 5 km', TODAY)).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+    // The duplicate is judged after the trim and the NFC normalisation.
+    expect(addHabit(db, '  Correr 5 km  ', TODAY)).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+  });
+
+  it('lets names that only differ in case or accents live together (RF-1.6)', () => {
+    const db = databaseWith([habit(1, 'Correr'), habit(2, 'Leer más')], 3);
+
+    expect(addHabit(db, 'correr', TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { id: 3, name: 'correr' } },
+    });
+    expect(addHabit(db, 'Leer mas', TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { id: 3, name: 'Leer mas' } },
+    });
+  });
+
+  it('propagates the name rules of RF-1.3, RF-1.4 and RF-1.5', () => {
+    const db = emptyDatabase();
+
+    expect(addHabit(db, '   ', TODAY)).toEqual({ ok: false, code: 'EMPTY_NAME' });
+    expect(addHabit(db, 'a'.repeat(61), TODAY)).toEqual({ ok: false, code: 'NAME_TOO_LONG' });
+    expect(addHabit(db, 'Leer\n20', TODAY)).toEqual({
+      ok: false,
+      code: 'NAME_NOT_SINGLE_LINE',
+    });
+  });
+
+  it('does not mutate the database it receives', () => {
+    const habits = [habit(1, 'Correr 5 km')];
+    const db = Object.freeze(databaseWith(habits, 2));
+
+    const result = addHabit(db, 'Meditar', TODAY);
+
+    expect(result).toMatchObject({ ok: true });
+    expect(db.nextId).toBe(2);
+    expect(db.habits).toBe(habits);
+    expect(habits).toEqual([habit(1, 'Correr 5 km')]);
+  });
+
+  it('leaves the database untouched when it rejects the name', () => {
+    const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km')], 2));
+
+    expect(addHabit(db, 'Correr 5 km', TODAY)).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+    expect(db).toEqual(databaseWith([habit(1, 'Correr 5 km')], 2));
   });
 });
