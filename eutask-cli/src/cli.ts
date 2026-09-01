@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { format } from 'date-fns';
 
+import { addCommand } from './commands/add.js';
+import type { CommandContext, CommandResult } from './commands/context.js';
+import { listCommand } from './commands/list.js';
 import type { IsoDate } from './core.js';
+import { resolveDataPath } from './storage.js';
 
 /** 0 when the command ended as expected, no-ops included. */
 export const EXIT_SUCCESS = 0;
@@ -25,10 +29,23 @@ const packageJson = JSON.parse(
   readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
 ) as { version: string };
 
-// Scaffolding until T13 to T15 give each command its body.
+// Scaffolding until T14 and T15 give the remaining commands their body.
 const pending = (name: string) => (): void => {
   process.stderr.write(`El comando «${name}» todavía no está implementado.\n`);
   process.exitCode = EXIT_FAILURE;
+};
+
+/** The outside world a command works against: the file, the local day and the two streams. */
+const commandContext = (): CommandContext => ({
+  dataPath: resolveDataPath(),
+  today: todayIsoDate(),
+  stdout: (text) => process.stdout.write(text),
+  stderr: (text) => process.stderr.write(text),
+});
+
+/** The commands say whether they ended as expected; the exit code is decided only here. */
+const finish = (result: CommandResult): void => {
+  process.exitCode = result ? EXIT_SUCCESS : EXIT_FAILURE;
 };
 
 /** The six commands of the spec, with their arguments and their help in Spanish. */
@@ -46,12 +63,16 @@ export const buildProgram = (): Command => {
     .command('add')
     .description('Crea un hábito nuevo.')
     .argument('<nombre>', 'Nombre del hábito, entre comillas si lleva espacios.')
-    .action(pending('add'));
+    .action((nombre: string) => {
+      finish(addCommand(nombre, commandContext()));
+    });
 
   program
     .command('list')
     .description('Muestra tus hábitos con su racha y si ya están hechos hoy.')
-    .action(pending('list'));
+    .action(() => {
+      finish(listCommand(commandContext()));
+    });
 
   program
     .command('done')
