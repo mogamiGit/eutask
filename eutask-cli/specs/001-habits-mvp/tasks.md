@@ -5,7 +5,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
 - [x] T1. Andamiaje: `package.json` (`bin.eutask` → `dist/cli.js`), `tsconfig` estricto, vitest,
       deps `commander`/`chalk`/`date-fns`/`zod`. (RF: —)
       Hecho cuando: `npx tsc --noEmit` y `npx vitest run` corren sin errores.
-- [ ] T2. core: tipos, `emptyDatabase`, `normalizeName`, `validateName`, `parseHabitId`.
+- [x] T2. core: tipos, `emptyDatabase`, `normalizeName`, `validateName`, `parseHabitId`.
       (RF-1.2..1.5, RF-1.8, RF-8.4)
       Hecho cuando: tests de vacío, 59/60/61, control, NFC vs NFD, e ids `0`/`-1`/`007`/`1.5` en verde.
 - [ ] T3. core.computeStreak con `today` inyectado. (RF-3)
