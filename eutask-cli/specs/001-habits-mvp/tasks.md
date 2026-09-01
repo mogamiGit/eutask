@@ -22,7 +22,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: tests de `$EUTASK_HOME`, archivo ausente, JSON roto y fuera de esquema en verde.
 - [x] T9. storage.saveDatabase atómico (tmp + fsync + rename). (RF-8.2, RF-8.3)
       Hecho cuando: guardar y releer da lo mismo, JSON a 2 espacios y sin `.tmp` residual.
-- [ ] T10. output.ts: mensajes en español y tabla de `list`. (RF-4.1, RF-4.3, RF-4.4, RNF-2)
+- [x] T10. output.ts: mensajes en español y tabla de `list`. (RF-4.1, RF-4.3, RF-4.4, RNF-2)
       Hecho cuando: cada `ErrorCode` tiene texto accionable y `[x] hecho`/`[ ] pendiente` sobreviven sin ANSI.
 - [ ] T11. confirm.ts con `node:readline` e `isTTY`. (RF-6.2, RF-6.4)
       Hecho cuando: solo la respuesta afirmativa explícita devuelve `true`.
