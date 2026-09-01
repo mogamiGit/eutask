@@ -26,7 +26,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: cada `ErrorCode` tiene texto accionable y `[x] hecho`/`[ ] pendiente` sobreviven sin ANSI.
 - [x] T11. confirm.ts con `node:readline` e `isTTY`. (RF-6.2, RF-6.4)
       Hecho cuando: solo la respuesta afirmativa explícita devuelve `true`.
-- [ ] T12. cli.ts con commander: seis comandos, `today` local, códigos de salida. (RF-1.1, RF-3.1)
+- [x] T12. cli.ts con commander: seis comandos, `today` local, códigos de salida. (RF-1.1, RF-3.1)
       Hecho cuando: `npm run build` y `node dist/cli.js --help` sale 0 listando los seis.
 - [ ] T13. Comandos `add` y `list`. (RF-1, RF-4, RF-8.2)
       Hecho cuando: `add` válido sale 0 con el id, inválido sale 1 sin tocar el archivo, `list` vacío sale 0.
