@@ -18,7 +18,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: tests de renombrado, conflicto, nombre idéntico, borrado sin reutilizar id en verde.
 - [x] T7. core.listHabits ordenado + invariante de no mutación. (RF-4.1, RF-4.2)
       Hecho cuando: test de orden por racha y desempate por id, y test que congela el `db` en verde.
-- [ ] T8. storage.resolveDataPath y loadDatabase con zod. (RF-8.1, RF-8.4, RF-8.5)
+- [x] T8. storage.resolveDataPath y loadDatabase con zod. (RF-8.1, RF-8.4, RF-8.5)
       Hecho cuando: tests de `$EUTASK_HOME`, archivo ausente, JSON roto y fuera de esquema en verde.
 - [ ] T9. storage.saveDatabase atómico (tmp + fsync + rename). (RF-8.2, RF-8.3)
       Hecho cuando: guardar y releer da lo mismo, JSON a 2 espacios y sin `.tmp` residual.
