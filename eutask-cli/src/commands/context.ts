@@ -12,6 +12,10 @@ export type CommandContext = {
   today: IsoDate;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  /** RF-6.4: whether there is somebody at the other end who can answer a question. */
+  interactive: boolean;
+  /** RF-6.2: asks before something irreversible. Only called when `interactive`. */
+  confirm: (question: string) => Promise<boolean>;
 };
 
 /**

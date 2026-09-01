@@ -11,7 +11,10 @@ import { addCommand } from './commands/add.js';
 import type { CommandContext, CommandResult } from './commands/context.js';
 import { doneCommand } from './commands/done.js';
 import { listCommand } from './commands/list.js';
+import { removeCommand } from './commands/remove.js';
+import { renameCommand } from './commands/rename.js';
 import { undoneCommand } from './commands/undone.js';
+import { askConfirmation, isInteractive } from './confirm.js';
 import type { IsoDate } from './core.js';
 import { resolveDataPath } from './storage.js';
 
@@ -31,18 +34,17 @@ const packageJson = JSON.parse(
   readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
 ) as { version: string };
 
-// Scaffolding until T14 and T15 give the remaining commands their body.
-const pending = (name: string) => (): void => {
-  process.stderr.write(`El comando «${name}» todavía no está implementado.\n`);
-  process.exitCode = EXIT_FAILURE;
-};
-
-/** The outside world a command works against: the file, the local day and the two streams. */
+/**
+ * The outside world a command works against: the file, the local day, the two streams and the
+ * question. This is the only place where the process itself is read.
+ */
 const commandContext = (): CommandContext => ({
   dataPath: resolveDataPath(),
   today: todayIsoDate(),
   stdout: (text) => process.stdout.write(text),
   stderr: (text) => process.stderr.write(text),
+  interactive: isInteractive(),
+  confirm: (question) => askConfirmation(question),
 });
 
 /** The commands say whether they ended as expected; the exit code is decided only here. */
@@ -97,14 +99,18 @@ export const buildProgram = (): Command => {
     .description('Cambia el nombre de un hábito sin perder su historial.')
     .argument('<id>', 'Identificador del hábito.')
     .argument('<nombre>', 'Nombre nuevo.')
-    .action(pending('rename'));
+    .action((id: string, nombre: string) => {
+      finish(renameCommand(id, nombre, commandContext()));
+    });
 
   program
     .command('remove')
     .description('Elimina un hábito y todo su historial.')
     .argument('<id>', 'Identificador del hábito.')
     .option('--yes', 'Elimina sin preguntar, para poder usarlo desde un script.')
-    .action(pending('remove'));
+    .action(async (id: string, options: { yes?: boolean }) => {
+      finish(await removeCommand(id, { yes: options.yes === true }, commandContext()));
+    });
 
   return program;
 };

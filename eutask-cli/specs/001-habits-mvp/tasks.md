@@ -32,7 +32,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: `add` válido sale 0 con el id, inválido sale 1 sin tocar el archivo, `list` vacío sale 0.
 - [x] T14. Comandos `done` y `undone`. (RF-2, RF-7, RF-1.8)
       Hecho cuando: éxito y no-op salen 0, id inexistente sale 1 sugiriendo `eutask list`.
-- [ ] T15. Comandos `rename` y `remove --yes`. (RF-5, RF-6)
+- [x] T15. Comandos `rename` y `remove --yes`. (RF-5, RF-6)
       Hecho cuando: `--yes` borra y sale 0; sin TTY y sin `--yes` sale 1 sin borrar; conflicto sale 1.
 - [ ] T16. E2E: helper `run()` con `mkdtemp` + un caso por fila de la tabla del plan. (RF-1..RF-8, RNF-2)
       Hecho cuando: cada fila tiene test que verifica código de salida y stdout/stderr.
