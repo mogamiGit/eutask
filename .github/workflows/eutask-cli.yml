@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# Empujar tres veces seguidas a la misma rama lanzaba tres ejecuciones y solo importa la última.
+# En `main` no se cancela: cada commit integrado merece su comprobación.
+concurrency:
+  group: eutask-cli-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 defaults:
   run:
     working-directory: eutask-cli

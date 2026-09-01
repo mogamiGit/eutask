@@ -1,9 +1,15 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCli, run } from './helpers/run.js';
+
+// Each case here launches at least one process, and the demo launches six in a row: around a
+// second on a developer machine, but a hosted runner is two or three times slower and the five
+// seconds vitest gives by default would be too tight. Only this file needs the room; the tests
+// that touch neither disk nor processes keep the strict default, where a slow one means a bug.
+vi.setConfig({ testTimeout: 30_000 });
 
 // T16 — the real binary, one process per run and a data directory of its own. One case per row
 // of the table in plan.md, "Contrato de la CLI": every row checks the exit code and what came
