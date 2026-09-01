@@ -2,7 +2,7 @@
 
 Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde al cerrar cada una.
 
-- [ ] T1. Andamiaje: `package.json` (`bin.eutask` → `dist/cli.js`), `tsconfig` estricto, vitest,
+- [x] T1. Andamiaje: `package.json` (`bin.eutask` → `dist/cli.js`), `tsconfig` estricto, vitest,
       deps `commander`/`chalk`/`date-fns`/`zod`. (RF: —)
       Hecho cuando: `npx tsc --noEmit` y `npx vitest run` corren sin errores.
 - [ ] T2. core: tipos, `emptyDatabase`, `normalizeName`, `validateName`, `parseHabitId`.
