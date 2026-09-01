@@ -211,17 +211,23 @@ describe('the identifier of the four commands that take one (RF-1.8)', () => {
     await eutask('add', 'Leer 20 páginas');
   });
 
-  const commands = [['done'], ['undone'], ['rename'], ['remove']];
+  /** Each command with exactly the arguments it takes, the identifier left to be filled in. */
+  const withId = (id: string): string[][] => [
+    ['done', id],
+    ['undone', id],
+    ['rename', id, 'Meditar'],
+    ['remove', id, '--yes'],
+  ];
 
-  it.each(commands)('%s fails on a malformed id pointing at list', async (command) => {
-    const { stderr, code } = await eutask(command, '007', 'Meditar');
+  it.each(withId('007'))('%s fails on a malformed id pointing at list', async (...args) => {
+    const { stderr, code } = await eutask(...args);
 
     expect(code).toBe(1);
     expect(stderr).toContain('Consulta tus hábitos con: eutask list');
   });
 
-  it.each(commands)('%s fails on an id that is not stored', async (command) => {
-    const { stderr, code } = await eutask(command, '9', 'Meditar');
+  it.each(withId('9'))('%s fails on an id that is not stored', async (...args) => {
+    const { stderr, code } = await eutask(...args);
 
     expect(code).toBe(1);
     expect(stderr).toContain('No existe ningún hábito con ese identificador.');
@@ -263,6 +269,19 @@ describe('the stored file (RF-8)', () => {
     expect(stderr).toContain('No se ha modificado.');
     expect(readFileSync(dataPath())).toEqual(before);
   });
+
+  it('stops on valid JSON that is not the format eutask expects (RF-8.5)', async () => {
+    // Damaged is not only unparseable: a file of another version, or with a habit without its
+    // marks, is read without complaint by JSON.parse and would be destroyed by the next save.
+    writeFileSync(dataPath(), JSON.stringify({ version: 2, nextId: 1, habits: [] }), 'utf8');
+    const before = readFileSync(dataPath());
+
+    const { stderr, code } = await eutask('list');
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('no tiene el formato que espera eutask');
+    expect(readFileSync(dataPath())).toEqual(before);
+  });
 });
 
 describe('the program itself', () => {
@@ -286,6 +305,25 @@ describe('the program itself', () => {
     const { code } = await eutask('inventado');
 
     expect(code).toBe(1);
+  });
+
+  it.each([
+    ['add', 'Meditar', 'sobra'],
+    ['list', 'sobra'],
+    ['done', '1', 'sobra'],
+    ['undone', '1', 'sobra'],
+    ['rename', '1', 'Meditar', 'sobra'],
+    ['remove', '1', '--yes', 'sobra'],
+  ])('fails on an argument too many instead of ignoring it: %s', async (...args) => {
+    // A typo must not pass for a valid command: an unexpected argument is a wrong argument
+    // (plan.md, "Contrato de la CLI"), and silently dropping it hides the mistake.
+    // The habit has to exist, otherwise the 1 would come from the id and not from the argument.
+    await eutask('add', 'Leer 20 páginas');
+
+    const { code, stderr } = await eutask(...args);
+
+    expect(code).toBe(1);
+    expect(stderr).not.toBe('');
   });
 
   it('runs the whole demo of the spec without errors', async () => {

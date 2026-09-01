@@ -52,9 +52,17 @@ const finish = (result: CommandResult): void => {
   process.exitCode = result ? EXIT_SUCCESS : EXIT_FAILURE;
 };
 
+/**
+ * Commander lets extra arguments through by default, so `eutask done 1 sobra` would silently
+ * drop the last word and answer 0. An unexpected argument is a wrong argument (plan.md,
+ * "Contrato de la CLI"): it is almost always a forgotten pair of quotes around a name with
+ * spaces, and saying so is more useful than obeying half of the order.
+ */
+const strict = (command: Command): Command => command.allowExcessArguments(false);
+
 /** The six commands of the spec, with their arguments and their help in Spanish. */
 export const buildProgram = (): Command => {
-  const program = new Command();
+  const program = strict(new Command());
 
   program
     .name('eutask')
@@ -63,39 +71,34 @@ export const buildProgram = (): Command => {
     .helpOption('-h, --help', 'Muestra esta ayuda.')
     .helpCommand('help [comando]', 'Muestra la ayuda de un comando.');
 
-  program
-    .command('add')
+  strict(program.command('add'))
     .description('Crea un hábito nuevo.')
     .argument('<nombre>', 'Nombre del hábito, entre comillas si lleva espacios.')
     .action((nombre: string) => {
       finish(addCommand(nombre, commandContext()));
     });
 
-  program
-    .command('list')
+  strict(program.command('list'))
     .description('Muestra tus hábitos con su racha y si ya están hechos hoy.')
     .action(() => {
       finish(listCommand(commandContext()));
     });
 
-  program
-    .command('done')
+  strict(program.command('done'))
     .description('Marca que hoy has cumplido un hábito.')
     .argument('<id>', 'Identificador del hábito.')
     .action((id: string) => {
       finish(doneCommand(id, commandContext()));
     });
 
-  program
-    .command('undone')
+  strict(program.command('undone'))
     .description('Retira la marca de hoy de un hábito.')
     .argument('<id>', 'Identificador del hábito.')
     .action((id: string) => {
       finish(undoneCommand(id, commandContext()));
     });
 
-  program
-    .command('rename')
+  strict(program.command('rename'))
     .description('Cambia el nombre de un hábito sin perder su historial.')
     .argument('<id>', 'Identificador del hábito.')
     .argument('<nombre>', 'Nombre nuevo.')
@@ -103,8 +106,7 @@ export const buildProgram = (): Command => {
       finish(renameCommand(id, nombre, commandContext()));
     });
 
-  program
-    .command('remove')
+  strict(program.command('remove'))
     .description('Elimina un hábito y todo su historial.')
     .argument('<id>', 'Identificador del hábito.')
     .option('--yes', 'Elimina sin preguntar, para poder usarlo desde un script.')

@@ -174,10 +174,12 @@ Desarrolladores con soltura en la terminal, que trabajan a diario en ella y
 
 ## Dudas abiertas
 
-Las seis dudas iniciales se resolvieron en la clarificación. Queda una, abierta en T14:
+Ninguna. Las seis dudas iniciales se resolvieron en la clarificación, y la que quedó abierta en
+T14 se cerró en T17:
 
-- `done` y `undone` tienen la misma estructura y solo difieren en la función del núcleo, la bandera
-  de no-op y los dos mensajes. ¿Compensa unificarlas? Unificarlas obliga a normalizar
-  `alreadyMarked` y `wasNotMarked` y a encajar `wasNotMarkedToday`, que no lleva racha, y la
-  abstracción solo tendría dos usuarios: `rename` y `remove` no entran en ese molde. Se decide en
-  el cierre (T17).
+- **`done` y `undone` se quedan como dos comandos paralelos.** Comparten estructura y solo difieren
+  en la función del núcleo, la bandera de no-op y los dos mensajes, pero unificarlas obliga a
+  normalizar `alreadyMarked` y `wasNotMarked` y a encajar `wasNotMarkedToday`, que no lleva racha.
+  La abstracción tendría exactamente dos usuarios y no crecerá: `rename` y `remove` no entran en
+  ese molde. Dos funciones que se leen de un vistazo pesan menos que una de orden superior con
+  tres parámetros de función.

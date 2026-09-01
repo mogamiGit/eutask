@@ -36,5 +36,5 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: `--yes` borra y sale 0; sin TTY y sin `--yes` sale 1 sin borrar; conflicto sale 1.
 - [x] T16. E2E: helper `run()` con `mkdtemp` + un caso por fila de la tabla del plan. (RF-1..RF-8, RNF-2)
       Hecho cuando: cada fila tiene test que verifica código de salida y stdout/stderr.
-- [ ] T17. Cierre: datos corruptos en los seis comandos, demo completa y checklist de la spec. (Todos)
+- [x] T17. Cierre: datos corruptos en los seis comandos, demo completa y checklist de la spec. (Todos)
       Hecho cuando: cada criterio EARS y caso límite tiene test, y la demo manual corre sin errores.
