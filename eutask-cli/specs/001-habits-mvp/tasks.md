@@ -8,7 +8,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
 - [x] T2. core: tipos, `emptyDatabase`, `normalizeName`, `validateName`, `parseHabitId`.
       (RF-1.2..1.5, RF-1.8, RF-8.4)
       Hecho cuando: tests de vacío, 59/60/61, control, NFC vs NFD, e ids `0`/`-1`/`007`/`1.5` en verde.
-- [ ] T3. core.computeStreak con `today` inyectado. (RF-3)
+- [x] T3. core.computeStreak con `today` inyectado. (RF-3)
       Hecho cuando: tests de sin marcas, solo hoy, viva por ayer, hueco y racha larga en verde.
 - [ ] T4. core.addHabit: id de `nextId`, duplicado exacto rechazado. (RF-1.1, RF-1.6, RF-1.7)
       Hecho cuando: tests de creación, duplicado, variantes por acentos y mayúsculas, y `nextId` en verde.

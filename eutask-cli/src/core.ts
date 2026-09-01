@@ -1,6 +1,8 @@
 // Pure domain core: it receives data and returns data. It never touches the clock,
 // the file system or the terminal (constitution, "Núcleo puro").
 
+import { format, parseISO, subDays } from 'date-fns';
+
 /** A local calendar day as 'YYYY-MM-DD'. Never an UTC instant. */
 export type IsoDate = string;
 
@@ -69,3 +71,30 @@ export const validateName = (raw: string): Result<string> => {
 /** RF-1.8: rejects '0', '-1', '1.5', '007', '1e3', ' 1 ' and anything non numeric. */
 export const parseHabitId = (raw: string): Result<number> =>
   HABIT_ID.test(raw) ? ok(Number(raw)) : fail('INVALID_ID');
+
+/** The day before, through date-fns: millisecond arithmetic would break on DST changes. */
+const previousDay = (date: IsoDate): IsoDate => format(subDays(parseISO(date), 1), 'yyyy-MM-dd');
+
+/**
+ * RF-3: consecutive marked days counted backwards. From today when it is marked (RF-3.2),
+ * from yesterday when it is not, so the streak stays alive all day long (RF-3.3), and 0
+ * otherwise (RF-3.4, RF-3.5). `today` is a parameter: the core never reads the clock (RF-3.1).
+ */
+export const computeStreak = (marks: readonly IsoDate[], today: IsoDate): number => {
+  const marked = new Set(marks);
+  const yesterday = previousDay(today);
+
+  let cursor: IsoDate;
+  if (marked.has(today)) cursor = today;
+  else if (marked.has(yesterday)) cursor = yesterday;
+  else return 0;
+
+  // Each turn consumes a different marked day, so the loop is bounded by the marks.
+  let streak = 0;
+  while (marked.has(cursor)) {
+    streak += 1;
+    cursor = previousDay(cursor);
+  }
+
+  return streak;
+};

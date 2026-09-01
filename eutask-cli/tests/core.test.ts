@@ -1,11 +1,14 @@
+import { format, parseISO, subDays } from 'date-fns';
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeStreak,
   emptyDatabase,
   normalizeName,
   parseHabitId,
   validateName,
   type Database,
+  type IsoDate,
 } from '../src/core.js';
 
 // T2 — domain types, empty database, name normalisation and validation, id parsing.
@@ -153,5 +156,73 @@ describe('parseHabitId (RF-1.8)', () => {
     expect(parseHabitId('1abc')).toEqual({ ok: false, code: 'INVALID_ID' });
     expect(parseHabitId('١٢')).toEqual({ ok: false, code: 'INVALID_ID' });
     expect(parseHabitId('1\n')).toEqual({ ok: false, code: 'INVALID_ID' });
+  });
+});
+
+describe('computeStreak (RF-3)', () => {
+  // T3 — fixed "today", never the real clock (RF-3.1).
+  const TODAY = '2026-09-01';
+  const daysBefore = (days: number): IsoDate =>
+    format(subDays(parseISO(TODAY), days), 'yyyy-MM-dd');
+
+  it('is 0 for a habit without any mark (RF-3.5)', () => {
+    expect(computeStreak([], TODAY)).toBe(0);
+  });
+
+  it('is 1 when the only mark is today (RF-3.2)', () => {
+    expect(computeStreak([TODAY], TODAY)).toBe(1);
+  });
+
+  it('counts back from today, today included (RF-3.2)', () => {
+    expect(computeStreak([daysBefore(2), daysBefore(1), TODAY], TODAY)).toBe(3);
+  });
+
+  it('stays alive all day long when the last mark is yesterday (RF-3.3)', () => {
+    expect(computeStreak([daysBefore(2), daysBefore(1)], TODAY)).toBe(2);
+  });
+
+  it('is 0 when there is no mark for today nor yesterday (RF-3.4)', () => {
+    expect(computeStreak([daysBefore(3), daysBefore(2)], TODAY)).toBe(0);
+  });
+
+  it('stops at the first missing day, so an older run does not count', () => {
+    // The gap on daysBefore(2) cuts the count: only yesterday survives.
+    expect(computeStreak([daysBefore(4), daysBefore(3), daysBefore(1)], TODAY)).toBe(1);
+  });
+
+  it('counts a long run across a month boundary', () => {
+    const marks = Array.from({ length: 30 }, (_, index) => daysBefore(index));
+
+    expect(marks).toContain('2026-08-03');
+    expect(computeStreak(marks, TODAY)).toBe(30);
+  });
+
+  it('ignores marks in the future', () => {
+    const tomorrow = format(subDays(parseISO(TODAY), -1), 'yyyy-MM-dd');
+
+    expect(computeStreak([tomorrow], TODAY)).toBe(0);
+    expect(computeStreak([TODAY, tomorrow], TODAY)).toBe(1);
+    expect(computeStreak([daysBefore(3), tomorrow], TODAY)).toBe(0);
+  });
+
+  it('does not depend on the order of the marks nor on repeated days', () => {
+    expect(computeStreak([TODAY, daysBefore(2), daysBefore(1)], TODAY)).toBe(3);
+    expect(computeStreak([TODAY, TODAY, daysBefore(1)], TODAY)).toBe(2);
+  });
+
+  it('takes today as a parameter, so the same marks give different streaks', () => {
+    const marks = [daysBefore(1), TODAY];
+
+    expect(computeStreak(marks, TODAY)).toBe(2);
+    expect(computeStreak(marks, daysBefore(1))).toBe(1);
+    expect(computeStreak(marks, daysBefore(3))).toBe(0);
+  });
+
+  it('does not mutate the marks it receives', () => {
+    const marks = [daysBefore(1), TODAY];
+
+    computeStreak(marks, TODAY);
+
+    expect(marks).toEqual([daysBefore(1), TODAY]);
   });
 });
