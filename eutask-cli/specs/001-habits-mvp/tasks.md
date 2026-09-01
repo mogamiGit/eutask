@@ -14,7 +14,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: tests de creación, duplicado, variantes por acentos y mayúsculas, y `nextId` en verde.
 - [x] T5. core.markDone y markUndone, idempotentes. (RF-2, RF-7)
       Hecho cuando: tests de primera marca, repetida, done→undone→done y días anteriores en verde.
-- [ ] T6. core.renameHabit y removeHabit. (RF-5, RF-6.1)
+- [x] T6. core.renameHabit y removeHabit. (RF-5, RF-6.1)
       Hecho cuando: tests de renombrado, conflicto, nombre idéntico, borrado sin reutilizar id en verde.
 - [ ] T7. core.listHabits ordenado + invariante de no mutación. (RF-4.1, RF-4.2)
       Hecho cuando: test de orden por racha y desempate por id, y test que congela el `db` en verde.

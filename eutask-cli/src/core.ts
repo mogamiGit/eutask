@@ -192,3 +192,44 @@ export const markUndone = (
     wasNotMarked: false,
   });
 };
+
+/**
+ * RF-5: only the name changes, so the id and the marks —and with them the streak— stay put
+ * (RF-5.3). The new name goes through the rules of RF-1.2..1.5 (RF-5.2) and cannot be the one
+ * of another habit (RF-5.4). Renaming a habit to its current name is accepted as a change with
+ * no effect and brings the same database back (RF-5.5).
+ */
+export const renameHabit = (
+  db: Database,
+  id: number,
+  rawName: string,
+): Result<{ db: Database; habit: Habit; unchanged: boolean }> => {
+  const current = db.habits.find((each) => each.id === id);
+  if (current === undefined) return fail('HABIT_NOT_FOUND');
+
+  const validated = validateName(rawName);
+  if (!validated.ok) return fail(validated.code);
+
+  const name = validated.value;
+  if (name === current.name) return ok({ db, habit: current, unchanged: true });
+
+  if (db.habits.some((each) => each.id !== id && each.name === name)) return fail('DUPLICATE_NAME');
+
+  const habit: Habit = { ...current, name };
+
+  return ok({ db: withHabit(db, habit), habit, unchanged: false });
+};
+
+/**
+ * RF-6.1: takes the habit and all its marks away. `nextId` is left alone, so the id of what
+ * has just been deleted is never handed out again (RF-1.7).
+ */
+export const removeHabit = (db: Database, id: number): Result<{ db: Database; habit: Habit }> => {
+  const habit = db.habits.find((each) => each.id === id);
+  if (habit === undefined) return fail('HABIT_NOT_FOUND');
+
+  return ok({
+    db: { ...db, habits: db.habits.filter((each) => each.id !== id) },
+    habit,
+  });
+};

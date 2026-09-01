@@ -9,6 +9,8 @@ import {
   markUndone,
   normalizeName,
   parseHabitId,
+  removeHabit,
+  renameHabit,
   validateName,
   type Database,
   type Habit,
@@ -510,5 +512,191 @@ describe('markDone and markUndone (RF-2, RF-7)', () => {
     expect(db.habits).toBe(habits);
     expect(marks).toEqual([YESTERDAY]);
     expect(marksOf(db, 1)).toEqual([YESTERDAY]);
+  });
+});
+
+describe('renameHabit and removeHabit (RF-5, RF-6.1)', () => {
+  // T6 — renaming keeps the history; removing takes it away without freeing the id.
+  const TODAY = '2026-09-01';
+  const YESTERDAY = '2026-08-31';
+
+  const databaseWith = (habits: Habit[], nextId = 9): Database => ({
+    version: 1,
+    nextId,
+    habits,
+  });
+
+  const habit = (id: number, name: string, marks: IsoDate[] = []): Habit => ({
+    id,
+    name,
+    createdAt: '2026-08-25',
+    marks,
+  });
+
+  describe('renameHabit', () => {
+    it('changes the name and nothing else (RF-5.1, RF-5.3)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
+
+      const result = renameHabit(db, 1, 'Correr 10 km');
+
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          db: expect.anything(),
+          habit: {
+            id: 1,
+            name: 'Correr 10 km',
+            createdAt: '2026-08-25',
+            marks: [YESTERDAY, TODAY],
+          },
+          unchanged: false,
+        },
+      });
+      if (!result.ok) return;
+      // The id and the marks survive, so the streak does too (RF-5.3).
+      expect(computeStreak(result.value.habit.marks, TODAY)).toBe(2);
+      expect(result.value.db.habits).toEqual([result.value.habit]);
+    });
+
+    it('stores the new name trimmed and normalised (RF-5.2)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+      expect(renameHabit(db, 1, `  cafe${COMBINING_ACUTE}  `)).toMatchObject({
+        ok: true,
+        value: { habit: { name: 'café' }, unchanged: false },
+      });
+    });
+
+    it('applies the name rules of RF-1.3, RF-1.4 and RF-1.5 (RF-5.2)', () => {
+      const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km')]));
+
+      expect(renameHabit(db, 1, '   ')).toEqual({ ok: false, code: 'EMPTY_NAME' });
+      expect(renameHabit(db, 1, 'a'.repeat(61))).toEqual({ ok: false, code: 'NAME_TOO_LONG' });
+      expect(renameHabit(db, 1, 'Correr\n10')).toEqual({
+        ok: false,
+        code: 'NAME_NOT_SINGLE_LINE',
+      });
+      expect(db.habits).toEqual([habit(1, 'Correr 5 km')]);
+    });
+
+    it('rejects the name of another habit without touching the data (RF-5.4)', () => {
+      const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]));
+
+      expect(renameHabit(db, 1, 'Meditar')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+      // The clash is judged after the trim and the NFC normalisation, as in RF-1.6.
+      expect(renameHabit(db, 1, '  Meditar  ')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+      expect(db.habits).toEqual([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]);
+    });
+
+    it('accepts the very same name as a change with no effect (RF-5.5)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY]), habit(2, 'Meditar')]);
+
+      const result = renameHabit(db, 1, 'Correr 5 km');
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { habit: { id: 1, name: 'Correr 5 km', marks: [TODAY] }, unchanged: true },
+      });
+      if (!result.ok) return;
+      // The very same database comes back, so the caller can skip the write.
+      expect(result.value.db).toBe(db);
+    });
+
+    it('treats adding or removing surrounding spaces as no change (RF-5.5)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+      expect(renameHabit(db, 1, '   Correr 5 km   ')).toMatchObject({
+        ok: true,
+        value: { unchanged: true },
+      });
+    });
+
+    it('tells apart a name that only differs in case or accents (RF-1.6)', () => {
+      const db = databaseWith([habit(1, 'Correr'), habit(2, 'Leer más')]);
+
+      expect(renameHabit(db, 1, 'correr')).toMatchObject({
+        ok: true,
+        value: { habit: { name: 'correr' }, unchanged: false },
+      });
+      expect(renameHabit(db, 1, 'Leer mas')).toMatchObject({
+        ok: true,
+        value: { habit: { name: 'Leer mas' }, unchanged: false },
+      });
+    });
+
+    it('fails on an id that matches no habit (RF-1.8)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+      expect(renameHabit(db, 7, 'Meditar')).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+    });
+
+    it('leaves the other habits and the rest of the database untouched', () => {
+      const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar', [TODAY])];
+      const db = Object.freeze(databaseWith(habits, 3));
+
+      const result = renameHabit(db, 1, 'Correr 10 km');
+
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
+      expect(result.value.db).toMatchObject({ version: 1, nextId: 3 });
+      expect(result.value.db.habits[1]).toEqual(habit(2, 'Meditar', [TODAY]));
+      expect(db.habits).toBe(habits);
+      expect(habits[0]).toEqual(habit(1, 'Correr 5 km'));
+    });
+  });
+
+  describe('removeHabit', () => {
+    it('deletes the habit with all its marks (RF-6.1)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY]), habit(2, 'Meditar')]);
+
+      const result = removeHabit(db, 1);
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { habit: { id: 1, name: 'Correr 5 km', marks: [YESTERDAY, TODAY] } },
+      });
+      if (!result.ok) return;
+      expect(result.value.db.habits).toEqual([habit(2, 'Meditar')]);
+    });
+
+    it('does not free the id it just deleted (RF-1.7)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')], 3);
+
+      const removed = removeHabit(db, 2);
+      expect(removed).toMatchObject({ ok: true });
+      if (!removed.ok) return;
+
+      // nextId stays at 3, so the next habit is 3 and never 2 again.
+      expect(removed.value.db.nextId).toBe(3);
+      expect(addHabit(removed.value.db, 'Leer 20 páginas', TODAY)).toMatchObject({
+        ok: true,
+        value: { habit: { id: 3 } },
+      });
+    });
+
+    it('empties the database when it removes the only habit', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY])], 2);
+
+      expect(removeHabit(db, 1)).toMatchObject({
+        ok: true,
+        value: { db: { version: 1, nextId: 2, habits: [] } },
+      });
+    });
+
+    it('fails on an id that matches no habit (RF-1.8)', () => {
+      const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+      expect(removeHabit(db, 7)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+    });
+
+    it('does not mutate the database it receives', () => {
+      const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar')];
+      const db = Object.freeze(databaseWith(habits, 3));
+
+      expect(removeHabit(db, 1)).toMatchObject({ ok: true });
+
+      expect(db.habits).toBe(habits);
+      expect(habits.map((each) => each.id)).toEqual([1, 2]);
+    });
   });
 });
