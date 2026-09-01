@@ -233,3 +233,24 @@ export const removeHabit = (db: Database, id: number): Result<{ db: Database; ha
     habit,
   });
 };
+
+/** What the list command shows of a habit (RF-4.1). */
+export type HabitView = { id: number; name: string; streak: number; doneToday: boolean };
+
+/** RF-4.1: whether the habit is already fulfilled on the given day. */
+export const isDoneToday = (habit: Habit, today: IsoDate): boolean => habit.marks.includes(today);
+
+/**
+ * RF-4.1 and RF-4.2: every habit with its streak and the state of today, from the longest
+ * streak to the shortest and, on a tie, by id ascending so the output is always the same.
+ * `map` builds a new array, so sorting it never reorders the habits of the caller.
+ */
+export const listHabits = (db: Database, today: IsoDate): HabitView[] =>
+  db.habits
+    .map((habit) => ({
+      id: habit.id,
+      name: habit.name,
+      streak: computeStreak(habit.marks, today),
+      doneToday: isDoneToday(habit, today),
+    }))
+    .sort((left, right) => right.streak - left.streak || left.id - right.id);

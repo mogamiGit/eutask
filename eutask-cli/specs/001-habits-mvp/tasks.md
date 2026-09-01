@@ -16,7 +16,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: tests de primera marca, repetida, done→undone→done y días anteriores en verde.
 - [x] T6. core.renameHabit y removeHabit. (RF-5, RF-6.1)
       Hecho cuando: tests de renombrado, conflicto, nombre idéntico, borrado sin reutilizar id en verde.
-- [ ] T7. core.listHabits ordenado + invariante de no mutación. (RF-4.1, RF-4.2)
+- [x] T7. core.listHabits ordenado + invariante de no mutación. (RF-4.1, RF-4.2)
       Hecho cuando: test de orden por racha y desempate por id, y test que congela el `db` en verde.
 - [ ] T8. storage.resolveDataPath y loadDatabase con zod. (RF-8.1, RF-8.4, RF-8.5)
       Hecho cuando: tests de `$EUTASK_HOME`, archivo ausente, JSON roto y fuera de esquema en verde.

@@ -5,6 +5,8 @@ import {
   addHabit,
   computeStreak,
   emptyDatabase,
+  isDoneToday,
+  listHabits,
   markDone,
   markUndone,
   normalizeName,
@@ -17,10 +19,29 @@ import {
   type IsoDate,
 } from '../src/core.js';
 
-// T2 — domain types, empty database, name normalisation and validation, id parsing.
-// RF-1.2..1.5, RF-1.8, RF-8.4. No clock and no disk here: everything is pure.
+// The core is pure, so these tests need neither the disk nor the clock: "today" is always
+// the fixed date below and every fixture is built here, in one place.
 
 const COMBINING_ACUTE = '́';
+
+const TODAY = '2026-09-01';
+const YESTERDAY = '2026-08-31';
+const TWO_DAYS_AGO = '2026-08-30';
+const THREE_DAYS_AGO = '2026-08-29';
+
+const daysBefore = (days: number): IsoDate => format(subDays(parseISO(TODAY), days), 'yyyy-MM-dd');
+
+const habit = (id: number, name: string, marks: IsoDate[] = []): Habit => ({
+  id,
+  name,
+  createdAt: '2026-08-25',
+  marks,
+});
+
+const databaseWith = (habits: Habit[], nextId = 9): Database => ({ version: 1, nextId, habits });
+
+const marksOf = (db: Database, id: number): IsoDate[] | undefined =>
+  db.habits.find((each) => each.id === id)?.marks;
 
 describe('emptyDatabase (RF-8.4)', () => {
   it('starts with no habits, version 1 and the first id still unused', () => {
@@ -166,11 +187,6 @@ describe('parseHabitId (RF-1.8)', () => {
 });
 
 describe('computeStreak (RF-3)', () => {
-  // T3 — fixed "today", never the real clock (RF-3.1).
-  const TODAY = '2026-09-01';
-  const daysBefore = (days: number): IsoDate =>
-    format(subDays(parseISO(TODAY), days), 'yyyy-MM-dd');
-
   it('is 0 for a habit without any mark (RF-3.5)', () => {
     expect(computeStreak([], TODAY)).toBe(0);
   });
@@ -180,20 +196,20 @@ describe('computeStreak (RF-3)', () => {
   });
 
   it('counts back from today, today included (RF-3.2)', () => {
-    expect(computeStreak([daysBefore(2), daysBefore(1), TODAY], TODAY)).toBe(3);
+    expect(computeStreak([TWO_DAYS_AGO, YESTERDAY, TODAY], TODAY)).toBe(3);
   });
 
   it('stays alive all day long when the last mark is yesterday (RF-3.3)', () => {
-    expect(computeStreak([daysBefore(2), daysBefore(1)], TODAY)).toBe(2);
+    expect(computeStreak([TWO_DAYS_AGO, YESTERDAY], TODAY)).toBe(2);
   });
 
   it('is 0 when there is no mark for today nor yesterday (RF-3.4)', () => {
-    expect(computeStreak([daysBefore(3), daysBefore(2)], TODAY)).toBe(0);
+    expect(computeStreak([THREE_DAYS_AGO, TWO_DAYS_AGO], TODAY)).toBe(0);
   });
 
   it('stops at the first missing day, so an older run does not count', () => {
-    // The gap on daysBefore(2) cuts the count: only yesterday survives.
-    expect(computeStreak([daysBefore(4), daysBefore(3), daysBefore(1)], TODAY)).toBe(1);
+    // The gap on TWO_DAYS_AGO cuts the count: only yesterday survives.
+    expect(computeStreak([daysBefore(4), THREE_DAYS_AGO, YESTERDAY], TODAY)).toBe(1);
   });
 
   it('counts a long run across a month boundary', () => {
@@ -204,52 +220,36 @@ describe('computeStreak (RF-3)', () => {
   });
 
   it('ignores marks in the future', () => {
-    const tomorrow = format(subDays(parseISO(TODAY), -1), 'yyyy-MM-dd');
+    const tomorrow = daysBefore(-1);
 
     expect(computeStreak([tomorrow], TODAY)).toBe(0);
     expect(computeStreak([TODAY, tomorrow], TODAY)).toBe(1);
-    expect(computeStreak([daysBefore(3), tomorrow], TODAY)).toBe(0);
+    expect(computeStreak([THREE_DAYS_AGO, tomorrow], TODAY)).toBe(0);
   });
 
   it('does not depend on the order of the marks nor on repeated days', () => {
-    expect(computeStreak([TODAY, daysBefore(2), daysBefore(1)], TODAY)).toBe(3);
-    expect(computeStreak([TODAY, TODAY, daysBefore(1)], TODAY)).toBe(2);
+    expect(computeStreak([TODAY, TWO_DAYS_AGO, YESTERDAY], TODAY)).toBe(3);
+    expect(computeStreak([TODAY, TODAY, YESTERDAY], TODAY)).toBe(2);
   });
 
   it('takes today as a parameter, so the same marks give different streaks', () => {
-    const marks = [daysBefore(1), TODAY];
+    const marks = [YESTERDAY, TODAY];
 
     expect(computeStreak(marks, TODAY)).toBe(2);
-    expect(computeStreak(marks, daysBefore(1))).toBe(1);
-    expect(computeStreak(marks, daysBefore(3))).toBe(0);
+    expect(computeStreak(marks, YESTERDAY)).toBe(1);
+    expect(computeStreak(marks, THREE_DAYS_AGO)).toBe(0);
   });
 
   it('does not mutate the marks it receives', () => {
-    const marks = [daysBefore(1), TODAY];
+    const marks = [YESTERDAY, TODAY];
 
     computeStreak(marks, TODAY);
 
-    expect(marks).toEqual([daysBefore(1), TODAY]);
+    expect(marks).toEqual([YESTERDAY, TODAY]);
   });
 });
 
 describe('addHabit (RF-1.1, RF-1.6, RF-1.7)', () => {
-  // T4 — creation, duplicate rejection and never reused ids.
-  const TODAY = '2026-09-01';
-
-  const databaseWith = (habits: Habit[], nextId: number): Database => ({
-    version: 1,
-    nextId,
-    habits,
-  });
-
-  const habit = (id: number, name: string, marks: IsoDate[] = []): Habit => ({
-    id,
-    name,
-    createdAt: '2026-08-25',
-    marks,
-  });
-
   it('creates the habit with no marks, so its streak starts at 0 (RF-1.1)', () => {
     const result = addHabit(emptyDatabase(), 'Leer 20 páginas', TODAY);
 
@@ -347,142 +347,125 @@ describe('addHabit (RF-1.1, RF-1.6, RF-1.7)', () => {
   });
 });
 
-describe('markDone and markUndone (RF-2, RF-7)', () => {
-  // T5 — both are idempotent: repeating them leaves the data as they were.
-  const TODAY = '2026-09-01';
-  const YESTERDAY = '2026-08-31';
-  const TWO_DAYS_AGO = '2026-08-30';
+describe('markDone (RF-2)', () => {
+  it('records today and reports the updated streak (RF-2.1)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TWO_DAYS_AGO, YESTERDAY])]);
 
-  const databaseWith = (habits: Habit[]): Database => ({ version: 1, nextId: 9, habits });
+    const result = markDone(db, 1, TODAY);
 
-  const habit = (id: number, name: string, marks: IsoDate[]): Habit => ({
-    id,
-    name,
-    createdAt: '2026-08-25',
-    marks,
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        habit: { id: 1, name: 'Correr 5 km', marks: [TWO_DAYS_AGO, YESTERDAY, TODAY] },
+        streak: 3,
+        alreadyMarked: false,
+      },
+    });
+    if (!result.ok) return;
+    expect(marksOf(result.value.db, 1)).toEqual([TWO_DAYS_AGO, YESTERDAY, TODAY]);
   });
 
-  const marksOf = (db: Database, id: number): IsoDate[] | undefined =>
-    db.habits.find((each) => each.id === id)?.marks;
+  it('turns the streak of a brand new habit from 0 into 1 (RF-3.2)', () => {
+    const db = databaseWith([habit(1, 'Meditar')]);
 
-  describe('markDone', () => {
-    it('records today and reports the updated streak (RF-2.1)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TWO_DAYS_AGO, YESTERDAY])]);
-
-      const result = markDone(db, 1, TODAY);
-
-      expect(result).toMatchObject({
-        ok: true,
-        value: {
-          habit: { id: 1, name: 'Correr 5 km', marks: [TWO_DAYS_AGO, YESTERDAY, TODAY] },
-          streak: 3,
-          alreadyMarked: false,
-        },
-      });
-      if (!result.ok) return;
-      expect(marksOf(result.value.db, 1)).toEqual([TWO_DAYS_AGO, YESTERDAY, TODAY]);
-    });
-
-    it('turns the streak of a brand new habit from 0 into 1 (RF-3.2)', () => {
-      const db = databaseWith([habit(1, 'Meditar', [])]);
-
-      expect(markDone(db, 1, TODAY)).toMatchObject({
-        ok: true,
-        value: { habit: { marks: [TODAY] }, streak: 1, alreadyMarked: false },
-      });
-    });
-
-    it('is a no-op when the habit was already marked today (RF-2.2)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
-
-      const result = markDone(db, 1, TODAY);
-
-      expect(result).toMatchObject({
-        ok: true,
-        value: { streak: 2, alreadyMarked: true },
-      });
-      if (!result.ok) return;
-      // The very same database comes back, so the caller can skip the write.
-      expect(result.value.db).toBe(db);
-      expect(marksOf(result.value.db, 1)).toEqual([YESTERDAY, TODAY]);
-    });
-
-    it('keeps the marks ascending and without duplicates', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY, TWO_DAYS_AGO])]);
-
-      const result = markDone(db, 1, TODAY);
-
-      expect(result).toMatchObject({ ok: true, value: { alreadyMarked: true } });
-      expect(markDone(databaseWith([habit(1, 'X', [TWO_DAYS_AGO])]), 1, TODAY)).toMatchObject({
-        ok: true,
-        value: { habit: { marks: [TWO_DAYS_AGO, TODAY] } },
-      });
-    });
-
-    it('touches only the habit it is given', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', []), habit(2, 'Meditar', [YESTERDAY])]);
-
-      const result = markDone(db, 1, TODAY);
-
-      expect(result).toMatchObject({ ok: true });
-      if (!result.ok) return;
-      expect(marksOf(result.value.db, 2)).toEqual([YESTERDAY]);
-      expect(result.value.db.habits.map((each) => each.id)).toEqual([1, 2]);
-    });
-
-    it('fails on an id that matches no habit (RF-1.8)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [])]);
-
-      expect(markDone(db, 7, TODAY)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+    expect(markDone(db, 1, TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { marks: [TODAY] }, streak: 1, alreadyMarked: false },
     });
   });
 
-  describe('markUndone', () => {
-    it('removes only the mark of today and reports the new streak (RF-7.1)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TWO_DAYS_AGO, YESTERDAY, TODAY])]);
+  it('is a no-op when the habit was already marked today (RF-2.2)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
 
-      const result = markUndone(db, 1, TODAY);
+    const result = markDone(db, 1, TODAY);
 
-      expect(result).toMatchObject({
-        ok: true,
-        value: {
-          habit: { marks: [TWO_DAYS_AGO, YESTERDAY] },
-          streak: 2,
-          wasNotMarked: false,
-        },
-      });
-      if (!result.ok) return;
-      // The older days survive, and the streak stays alive through yesterday (RF-3.3).
-      expect(marksOf(result.value.db, 1)).toEqual([TWO_DAYS_AGO, YESTERDAY]);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { streak: 2, alreadyMarked: true },
     });
+    if (!result.ok) return;
+    // The very same database comes back, so the caller can skip the write.
+    expect(result.value.db).toBe(db);
+    expect(marksOf(result.value.db, 1)).toEqual([YESTERDAY, TODAY]);
+  });
 
-    it('leaves the habit with streak 0 when today was its only mark (RF-3.5)', () => {
-      const db = databaseWith([habit(1, 'Meditar', [TODAY])]);
+  it('keeps the marks ascending and without duplicates', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TODAY, TWO_DAYS_AGO])]);
 
-      expect(markUndone(db, 1, TODAY)).toMatchObject({
-        ok: true,
-        value: { habit: { id: 1, name: 'Meditar', marks: [] }, streak: 0, wasNotMarked: false },
-      });
-    });
+    const result = markDone(db, 1, TODAY);
 
-    it('is a no-op when the habit was not marked today (RF-7.2)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY])]);
-
-      const result = markUndone(db, 1, TODAY);
-
-      expect(result).toMatchObject({ ok: true, value: { streak: 1, wasNotMarked: true } });
-      if (!result.ok) return;
-      expect(result.value.db).toBe(db);
-      expect(marksOf(result.value.db, 1)).toEqual([YESTERDAY]);
-    });
-
-    it('fails on an id that matches no habit (RF-1.8)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY])]);
-
-      expect(markUndone(db, 7, TODAY)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+    expect(result).toMatchObject({ ok: true, value: { alreadyMarked: true } });
+    expect(markDone(databaseWith([habit(1, 'X', [TWO_DAYS_AGO])]), 1, TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { marks: [TWO_DAYS_AGO, TODAY] } },
     });
   });
 
+  it('touches only the habit it is given', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar', [YESTERDAY])]);
+
+    const result = markDone(db, 1, TODAY);
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(marksOf(result.value.db, 2)).toEqual([YESTERDAY]);
+    expect(result.value.db.habits.map((each) => each.id)).toEqual([1, 2]);
+  });
+
+  it('fails on an id that matches no habit (RF-1.8)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+    expect(markDone(db, 7, TODAY)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+  });
+});
+
+describe('markUndone (RF-7)', () => {
+  it('removes only the mark of today and reports the new streak (RF-7.1)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TWO_DAYS_AGO, YESTERDAY, TODAY])]);
+
+    const result = markUndone(db, 1, TODAY);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        habit: { marks: [TWO_DAYS_AGO, YESTERDAY] },
+        streak: 2,
+        wasNotMarked: false,
+      },
+    });
+    if (!result.ok) return;
+    // The older days survive, and the streak stays alive through yesterday (RF-3.3).
+    expect(marksOf(result.value.db, 1)).toEqual([TWO_DAYS_AGO, YESTERDAY]);
+  });
+
+  it('leaves the habit with streak 0 when today was its only mark (RF-3.5)', () => {
+    const db = databaseWith([habit(1, 'Meditar', [TODAY])]);
+
+    expect(markUndone(db, 1, TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { id: 1, name: 'Meditar', marks: [] }, streak: 0, wasNotMarked: false },
+    });
+  });
+
+  it('is a no-op when the habit was not marked today (RF-7.2)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY])]);
+
+    const result = markUndone(db, 1, TODAY);
+
+    expect(result).toMatchObject({ ok: true, value: { streak: 1, wasNotMarked: true } });
+    if (!result.ok) return;
+    expect(result.value.db).toBe(db);
+    expect(marksOf(result.value.db, 1)).toEqual([YESTERDAY]);
+  });
+
+  it('fails on an id that matches no habit (RF-1.8)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TODAY])]);
+
+    expect(markUndone(db, 7, TODAY)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+  });
+});
+
+describe('markDone and markUndone together (RF-2, RF-7)', () => {
   it('leaves a single mark after done, undone and done on the same day (RF-2.1, RF-7.1)', () => {
     const start = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY])]);
 
@@ -515,188 +498,279 @@ describe('markDone and markUndone (RF-2, RF-7)', () => {
   });
 });
 
-describe('renameHabit and removeHabit (RF-5, RF-6.1)', () => {
-  // T6 — renaming keeps the history; removing takes it away without freeing the id.
-  const TODAY = '2026-09-01';
-  const YESTERDAY = '2026-08-31';
+describe('renameHabit (RF-5)', () => {
+  it('changes the name and nothing else (RF-5.1, RF-5.3)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
 
-  const databaseWith = (habits: Habit[], nextId = 9): Database => ({
-    version: 1,
-    nextId,
-    habits,
-  });
+    const result = renameHabit(db, 1, 'Correr 10 km');
 
-  const habit = (id: number, name: string, marks: IsoDate[] = []): Habit => ({
-    id,
-    name,
-    createdAt: '2026-08-25',
-    marks,
-  });
-
-  describe('renameHabit', () => {
-    it('changes the name and nothing else (RF-5.1, RF-5.3)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
-
-      const result = renameHabit(db, 1, 'Correr 10 km');
-
-      expect(result).toEqual({
-        ok: true,
-        value: {
-          db: expect.anything(),
-          habit: {
-            id: 1,
-            name: 'Correr 10 km',
-            createdAt: '2026-08-25',
-            marks: [YESTERDAY, TODAY],
-          },
-          unchanged: false,
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        db: expect.anything(),
+        habit: {
+          id: 1,
+          name: 'Correr 10 km',
+          createdAt: '2026-08-25',
+          marks: [YESTERDAY, TODAY],
         },
-      });
-      if (!result.ok) return;
-      // The id and the marks survive, so the streak does too (RF-5.3).
-      expect(computeStreak(result.value.habit.marks, TODAY)).toBe(2);
-      expect(result.value.db.habits).toEqual([result.value.habit]);
+        unchanged: false,
+      },
     });
+    if (!result.ok) return;
+    // The id and the marks survive, so the streak does too (RF-5.3).
+    expect(computeStreak(result.value.habit.marks, TODAY)).toBe(2);
+    expect(result.value.db.habits).toEqual([result.value.habit]);
+  });
 
-    it('stores the new name trimmed and normalised (RF-5.2)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km')]);
+  it('stores the new name trimmed and normalised (RF-5.2)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')]);
 
-      expect(renameHabit(db, 1, `  cafe${COMBINING_ACUTE}  `)).toMatchObject({
-        ok: true,
-        value: { habit: { name: 'café' }, unchanged: false },
-      });
-    });
-
-    it('applies the name rules of RF-1.3, RF-1.4 and RF-1.5 (RF-5.2)', () => {
-      const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km')]));
-
-      expect(renameHabit(db, 1, '   ')).toEqual({ ok: false, code: 'EMPTY_NAME' });
-      expect(renameHabit(db, 1, 'a'.repeat(61))).toEqual({ ok: false, code: 'NAME_TOO_LONG' });
-      expect(renameHabit(db, 1, 'Correr\n10')).toEqual({
-        ok: false,
-        code: 'NAME_NOT_SINGLE_LINE',
-      });
-      expect(db.habits).toEqual([habit(1, 'Correr 5 km')]);
-    });
-
-    it('rejects the name of another habit without touching the data (RF-5.4)', () => {
-      const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]));
-
-      expect(renameHabit(db, 1, 'Meditar')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
-      // The clash is judged after the trim and the NFC normalisation, as in RF-1.6.
-      expect(renameHabit(db, 1, '  Meditar  ')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
-      expect(db.habits).toEqual([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]);
-    });
-
-    it('accepts the very same name as a change with no effect (RF-5.5)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY]), habit(2, 'Meditar')]);
-
-      const result = renameHabit(db, 1, 'Correr 5 km');
-
-      expect(result).toMatchObject({
-        ok: true,
-        value: { habit: { id: 1, name: 'Correr 5 km', marks: [TODAY] }, unchanged: true },
-      });
-      if (!result.ok) return;
-      // The very same database comes back, so the caller can skip the write.
-      expect(result.value.db).toBe(db);
-    });
-
-    it('treats adding or removing surrounding spaces as no change (RF-5.5)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km')]);
-
-      expect(renameHabit(db, 1, '   Correr 5 km   ')).toMatchObject({
-        ok: true,
-        value: { unchanged: true },
-      });
-    });
-
-    it('tells apart a name that only differs in case or accents (RF-1.6)', () => {
-      const db = databaseWith([habit(1, 'Correr'), habit(2, 'Leer más')]);
-
-      expect(renameHabit(db, 1, 'correr')).toMatchObject({
-        ok: true,
-        value: { habit: { name: 'correr' }, unchanged: false },
-      });
-      expect(renameHabit(db, 1, 'Leer mas')).toMatchObject({
-        ok: true,
-        value: { habit: { name: 'Leer mas' }, unchanged: false },
-      });
-    });
-
-    it('fails on an id that matches no habit (RF-1.8)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km')]);
-
-      expect(renameHabit(db, 7, 'Meditar')).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
-    });
-
-    it('leaves the other habits and the rest of the database untouched', () => {
-      const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar', [TODAY])];
-      const db = Object.freeze(databaseWith(habits, 3));
-
-      const result = renameHabit(db, 1, 'Correr 10 km');
-
-      expect(result).toMatchObject({ ok: true });
-      if (!result.ok) return;
-      expect(result.value.db).toMatchObject({ version: 1, nextId: 3 });
-      expect(result.value.db.habits[1]).toEqual(habit(2, 'Meditar', [TODAY]));
-      expect(db.habits).toBe(habits);
-      expect(habits[0]).toEqual(habit(1, 'Correr 5 km'));
+    expect(renameHabit(db, 1, `  cafe${COMBINING_ACUTE}  `)).toMatchObject({
+      ok: true,
+      value: { habit: { name: 'café' }, unchanged: false },
     });
   });
 
-  describe('removeHabit', () => {
-    it('deletes the habit with all its marks (RF-6.1)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY]), habit(2, 'Meditar')]);
+  it('applies the name rules of RF-1.3, RF-1.4 and RF-1.5 (RF-5.2)', () => {
+    const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km')]));
 
-      const result = removeHabit(db, 1);
-
-      expect(result).toMatchObject({
-        ok: true,
-        value: { habit: { id: 1, name: 'Correr 5 km', marks: [YESTERDAY, TODAY] } },
-      });
-      if (!result.ok) return;
-      expect(result.value.db.habits).toEqual([habit(2, 'Meditar')]);
+    expect(renameHabit(db, 1, '   ')).toEqual({ ok: false, code: 'EMPTY_NAME' });
+    expect(renameHabit(db, 1, 'a'.repeat(61))).toEqual({ ok: false, code: 'NAME_TOO_LONG' });
+    expect(renameHabit(db, 1, 'Correr\n10')).toEqual({
+      ok: false,
+      code: 'NAME_NOT_SINGLE_LINE',
     });
+    expect(db.habits).toEqual([habit(1, 'Correr 5 km')]);
+  });
 
-    it('does not free the id it just deleted (RF-1.7)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')], 3);
+  it('rejects the name of another habit without touching the data (RF-5.4)', () => {
+    const db = Object.freeze(databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]));
 
-      const removed = removeHabit(db, 2);
-      expect(removed).toMatchObject({ ok: true });
-      if (!removed.ok) return;
+    expect(renameHabit(db, 1, 'Meditar')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+    // The clash is judged after the trim and the NFC normalisation, as in RF-1.6.
+    expect(renameHabit(db, 1, '  Meditar  ')).toEqual({ ok: false, code: 'DUPLICATE_NAME' });
+    expect(db.habits).toEqual([habit(1, 'Correr 5 km'), habit(2, 'Meditar')]);
+  });
 
-      // nextId stays at 3, so the next habit is 3 and never 2 again.
-      expect(removed.value.db.nextId).toBe(3);
-      expect(addHabit(removed.value.db, 'Leer 20 páginas', TODAY)).toMatchObject({
-        ok: true,
-        value: { habit: { id: 3 } },
-      });
+  it('accepts the very same name as a change with no effect (RF-5.5)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TODAY]), habit(2, 'Meditar')]);
+
+    const result = renameHabit(db, 1, 'Correr 5 km');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { habit: { id: 1, name: 'Correr 5 km', marks: [TODAY] }, unchanged: true },
     });
+    if (!result.ok) return;
+    // The very same database comes back, so the caller can skip the write.
+    expect(result.value.db).toBe(db);
+  });
 
-    it('empties the database when it removes the only habit', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km', [TODAY])], 2);
+  it('treats adding or removing surrounding spaces as no change (RF-5.5)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')]);
 
-      expect(removeHabit(db, 1)).toMatchObject({
-        ok: true,
-        value: { db: { version: 1, nextId: 2, habits: [] } },
-      });
+    expect(renameHabit(db, 1, '   Correr 5 km   ')).toMatchObject({
+      ok: true,
+      value: { unchanged: true },
     });
+  });
 
-    it('fails on an id that matches no habit (RF-1.8)', () => {
-      const db = databaseWith([habit(1, 'Correr 5 km')]);
+  it('tells apart a name that only differs in case or accents (RF-1.6)', () => {
+    const db = databaseWith([habit(1, 'Correr'), habit(2, 'Leer más')]);
 
-      expect(removeHabit(db, 7)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+    expect(renameHabit(db, 1, 'correr')).toMatchObject({
+      ok: true,
+      value: { habit: { name: 'correr' }, unchanged: false },
     });
-
-    it('does not mutate the database it receives', () => {
-      const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar')];
-      const db = Object.freeze(databaseWith(habits, 3));
-
-      expect(removeHabit(db, 1)).toMatchObject({ ok: true });
-
-      expect(db.habits).toBe(habits);
-      expect(habits.map((each) => each.id)).toEqual([1, 2]);
+    expect(renameHabit(db, 1, 'Leer mas')).toMatchObject({
+      ok: true,
+      value: { habit: { name: 'Leer mas' }, unchanged: false },
     });
+  });
+
+  it('fails on an id that matches no habit (RF-1.8)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+    expect(renameHabit(db, 7, 'Meditar')).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+  });
+
+  it('leaves the other habits and the rest of the database untouched', () => {
+    const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar', [TODAY])];
+    const db = Object.freeze(databaseWith(habits, 3));
+
+    const result = renameHabit(db, 1, 'Correr 10 km');
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.value.db).toMatchObject({ version: 1, nextId: 3 });
+    expect(result.value.db.habits[1]).toEqual(habit(2, 'Meditar', [TODAY]));
+    expect(db.habits).toBe(habits);
+    expect(habits[0]).toEqual(habit(1, 'Correr 5 km'));
+  });
+});
+
+describe('removeHabit (RF-6.1)', () => {
+  it('deletes the habit with all its marks', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY]), habit(2, 'Meditar')]);
+
+    const result = removeHabit(db, 1);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { habit: { id: 1, name: 'Correr 5 km', marks: [YESTERDAY, TODAY] } },
+    });
+    if (!result.ok) return;
+    expect(result.value.db.habits).toEqual([habit(2, 'Meditar')]);
+  });
+
+  it('does not free the id it just deleted (RF-1.7)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km'), habit(2, 'Meditar')], 3);
+
+    const removed = removeHabit(db, 2);
+    expect(removed).toMatchObject({ ok: true });
+    if (!removed.ok) return;
+
+    // nextId stays at 3, so the next habit is 3 and never 2 again.
+    expect(removed.value.db.nextId).toBe(3);
+    expect(addHabit(removed.value.db, 'Leer 20 páginas', TODAY)).toMatchObject({
+      ok: true,
+      value: { habit: { id: 3 } },
+    });
+  });
+
+  it('empties the database when it removes the only habit', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TODAY])], 2);
+
+    expect(removeHabit(db, 1)).toMatchObject({
+      ok: true,
+      value: { db: { version: 1, nextId: 2, habits: [] } },
+    });
+  });
+
+  it('fails on an id that matches no habit (RF-1.8)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km')]);
+
+    expect(removeHabit(db, 7)).toEqual({ ok: false, code: 'HABIT_NOT_FOUND' });
+  });
+
+  it('does not mutate the database it receives', () => {
+    const habits = [habit(1, 'Correr 5 km'), habit(2, 'Meditar')];
+    const db = Object.freeze(databaseWith(habits, 3));
+
+    expect(removeHabit(db, 1)).toMatchObject({ ok: true });
+
+    expect(db.habits).toBe(habits);
+    expect(habits.map((each) => each.id)).toEqual([1, 2]);
+  });
+});
+
+describe('isDoneToday (RF-4.1)', () => {
+  it('is true only when the habit has a mark for today', () => {
+    expect(isDoneToday(habit(1, 'Correr 5 km', [YESTERDAY, TODAY]), TODAY)).toBe(true);
+    expect(isDoneToday(habit(1, 'Correr 5 km', [YESTERDAY]), TODAY)).toBe(false);
+    expect(isDoneToday(habit(1, 'Meditar'), TODAY)).toBe(false);
+  });
+});
+
+describe('listHabits (RF-4.1, RF-4.2)', () => {
+  it('gives back nothing when there are no habits (RF-4.3)', () => {
+    expect(listHabits(emptyDatabase(), TODAY)).toEqual([]);
+  });
+
+  it('reports the id, the name, the streak and the state of today (RF-4.1)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
+
+    expect(listHabits(db, TODAY)).toEqual([
+      { id: 1, name: 'Correr 5 km', streak: 2, doneToday: true },
+    ]);
+  });
+
+  it('shows a habit marked yesterday as pending, with its streak alive (RF-3.3)', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [TWO_DAYS_AGO, YESTERDAY])]);
+
+    expect(listHabits(db, TODAY)).toEqual([
+      { id: 1, name: 'Correr 5 km', streak: 2, doneToday: false },
+    ]);
+  });
+
+  it('sorts by streak, from the longest to the shortest (RF-4.2)', () => {
+    const db = databaseWith([
+      habit(1, 'Meditar'),
+      habit(2, 'Correr 5 km', [YESTERDAY, TODAY]),
+      habit(3, 'Leer 20 páginas', [THREE_DAYS_AGO, TWO_DAYS_AGO, YESTERDAY, TODAY]),
+    ]);
+
+    expect(listHabits(db, TODAY).map((each) => [each.id, each.streak])).toEqual([
+      [3, 4],
+      [2, 2],
+      [1, 0],
+    ]);
+  });
+
+  it('breaks a tie by id, ascending, so the output is deterministic (RF-4.2)', () => {
+    const db = databaseWith([
+      habit(5, 'Meditar', [TODAY]),
+      habit(2, 'Correr 5 km', [TODAY]),
+      habit(9, 'Leer 20 páginas', [YESTERDAY]),
+      habit(4, 'Dormir 8 h'),
+    ]);
+
+    expect(listHabits(db, TODAY).map((each) => [each.id, each.streak])).toEqual([
+      [2, 1],
+      [5, 1],
+      [9, 1],
+      [4, 0],
+    ]);
+  });
+
+  it('takes today as a parameter, so the same data give a different view', () => {
+    const db = databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY])]);
+
+    expect(listHabits(db, YESTERDAY)).toEqual([
+      { id: 1, name: 'Correr 5 km', streak: 1, doneToday: true },
+    ]);
+  });
+
+  it('does not mutate the database, not even the order of its habits', () => {
+    // Sorting in place would reorder the caller's array before it reaches disk.
+    const habits = [habit(1, 'Meditar'), habit(2, 'Correr 5 km', [TODAY])];
+    const db = Object.freeze(databaseWith(habits));
+
+    const view = listHabits(db, TODAY);
+
+    expect(view.map((each) => each.id)).toEqual([2, 1]);
+    expect(db.habits).toBe(habits);
+    expect(habits.map((each) => each.id)).toEqual([1, 2]);
+    expect(habits[1]?.marks).toEqual([TODAY]);
+  });
+});
+
+describe('the core never mutates what it receives', () => {
+  // Cross-cutting invariant: every operation builds a new database (plan, "API del núcleo").
+  const snapshot = (db: Database): string => JSON.stringify(db);
+
+  const database = (): Database =>
+    databaseWith([habit(1, 'Correr 5 km', [YESTERDAY, TODAY]), habit(2, 'Meditar')], 3);
+
+  const operations: [string, (db: Database) => unknown][] = [
+    ['addHabit', (db) => addHabit(db, 'Leer 20 páginas', TODAY)],
+    ['markDone', (db) => markDone(db, 2, TODAY)],
+    ['markDone (no-op)', (db) => markDone(db, 1, TODAY)],
+    ['markUndone', (db) => markUndone(db, 1, TODAY)],
+    ['markUndone (no-op)', (db) => markUndone(db, 2, TODAY)],
+    ['renameHabit', (db) => renameHabit(db, 1, 'Correr 10 km')],
+    ['renameHabit (no-op)', (db) => renameHabit(db, 1, 'Correr 5 km')],
+    ['removeHabit', (db) => removeHabit(db, 1)],
+    ['listHabits', (db) => listHabits(db, TODAY)],
+  ];
+
+  it.each(operations)('%s leaves the database exactly as it was', (_name, operate) => {
+    const db = database();
+    const before = snapshot(db);
+
+    operate(db);
+
+    expect(snapshot(db)).toBe(before);
   });
 });
