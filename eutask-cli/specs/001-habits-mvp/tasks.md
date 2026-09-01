@@ -20,7 +20,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: test de orden por racha y desempate por id, y test que congela el `db` en verde.
 - [x] T8. storage.resolveDataPath y loadDatabase con zod. (RF-8.1, RF-8.4, RF-8.5)
       Hecho cuando: tests de `$EUTASK_HOME`, archivo ausente, JSON roto y fuera de esquema en verde.
-- [ ] T9. storage.saveDatabase atómico (tmp + fsync + rename). (RF-8.2, RF-8.3)
+- [x] T9. storage.saveDatabase atómico (tmp + fsync + rename). (RF-8.2, RF-8.3)
       Hecho cuando: guardar y releer da lo mismo, JSON a 2 espacios y sin `.tmp` residual.
 - [ ] T10. output.ts: mensajes en español y tabla de `list`. (RF-4.1, RF-4.3, RF-4.4, RNF-2)
       Hecho cuando: cada `ErrorCode` tiene texto accionable y `[x] hecho`/`[ ] pendiente` sobreviven sin ANSI.
