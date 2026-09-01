@@ -1,9 +1,9 @@
 // What every command needs from the outside world. The clock, the path and the two streams are
 // parameters, so a command can be exercised without spawning a process (plan, "Módulos").
 
-import type { Database, IsoDate } from '../core.js';
+import { parseHabitId, type Database, type IsoDate } from '../core.js';
 import { loadDatabase } from '../storage.js';
-import { loadErrorText } from '../output.js';
+import { errorText, loadErrorText } from '../output.js';
 
 export type CommandContext = {
   /** Where the single JSON lives, already resolved by cli.ts (RF-8.1). */
@@ -36,4 +36,20 @@ export const loadOrReport = (context: CommandContext): Database | undefined => {
   }
 
   return loaded.db;
+};
+
+/**
+ * RF-1.8: the identifier the four commands that take one share. It is checked before reading
+ * anything, so a malformed id never even opens the file. The message already points at
+ * `eutask list`, which is where the identifiers in force can be seen.
+ */
+export const parseIdOrReport = (raw: string, context: CommandContext): number | undefined => {
+  const parsed = parseHabitId(raw);
+
+  if (!parsed.ok) {
+    context.stderr(`${errorText(parsed.code)}\n`);
+    return undefined;
+  }
+
+  return parsed.value;
 };

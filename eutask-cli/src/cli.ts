@@ -9,7 +9,9 @@ import { format } from 'date-fns';
 
 import { addCommand } from './commands/add.js';
 import type { CommandContext, CommandResult } from './commands/context.js';
+import { doneCommand } from './commands/done.js';
 import { listCommand } from './commands/list.js';
+import { undoneCommand } from './commands/undone.js';
 import type { IsoDate } from './core.js';
 import { resolveDataPath } from './storage.js';
 
@@ -78,13 +80,17 @@ export const buildProgram = (): Command => {
     .command('done')
     .description('Marca que hoy has cumplido un hábito.')
     .argument('<id>', 'Identificador del hábito.')
-    .action(pending('done'));
+    .action((id: string) => {
+      finish(doneCommand(id, commandContext()));
+    });
 
   program
     .command('undone')
     .description('Retira la marca de hoy de un hábito.')
     .argument('<id>', 'Identificador del hábito.')
-    .action(pending('undone'));
+    .action((id: string) => {
+      finish(undoneCommand(id, commandContext()));
+    });
 
   program
     .command('rename')

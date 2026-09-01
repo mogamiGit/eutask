@@ -174,4 +174,10 @@ Desarrolladores con soltura en la terminal, que trabajan a diario en ella y
 
 ## Dudas abiertas
 
-Ninguna. Las seis dudas iniciales se resolvieron en la clarificación.
+Las seis dudas iniciales se resolvieron en la clarificación. Queda una, abierta en T14:
+
+- `done` y `undone` tienen la misma estructura y solo difieren en la función del núcleo, la bandera
+  de no-op y los dos mensajes. ¿Compensa unificarlas? Unificarlas obliga a normalizar
+  `alreadyMarked` y `wasNotMarked` y a encajar `wasNotMarkedToday`, que no lleva racha, y la
+  abstracción solo tendría dos usuarios: `rename` y `remove` no entran en ese molde. Se decide en
+  el cierre (T17).

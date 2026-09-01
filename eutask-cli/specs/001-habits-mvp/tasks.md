@@ -30,7 +30,7 @@ Detalle de diseño en `plan.md`. Orden de dependencia; `npx vitest run` en verde
       Hecho cuando: `npm run build` y `node dist/cli.js --help` sale 0 listando los seis.
 - [x] T13. Comandos `add` y `list`. (RF-1, RF-4, RF-8.2)
       Hecho cuando: `add` válido sale 0 con el id, inválido sale 1 sin tocar el archivo, `list` vacío sale 0.
-- [ ] T14. Comandos `done` y `undone`. (RF-2, RF-7, RF-1.8)
+- [x] T14. Comandos `done` y `undone`. (RF-2, RF-7, RF-1.8)
       Hecho cuando: éxito y no-op salen 0, id inexistente sale 1 sugiriendo `eutask list`.
 - [ ] T15. Comandos `rename` y `remove --yes`. (RF-5, RF-6)
       Hecho cuando: `--yes` borra y sale 0; sin TTY y sin `--yes` sale 1 sin borrar; conflicto sale 1.
