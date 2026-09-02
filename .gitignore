@@ -6,6 +6,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Dependencias y compilación de Node
+node_modules/
+dist/
+*.log
+
 # macOS
 .DS_Store
 
