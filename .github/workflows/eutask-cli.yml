@@ -1,0 +1,44 @@
+name: eutask-cli
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Empujar tres veces seguidas a la misma rama lanzaba tres ejecuciones y solo importa la última.
+# En `main` no se cancela: cada commit integrado merece su comprobación.
+concurrency:
+  group: eutask-cli-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: eutask-cli
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # v5 porque el runtime de Node 20 está retirado en las actions. Es la versión con la que
+      # corre la action, no la del proyecto: esa la fija `node-version`.
+      - uses: actions/setup-node@v5
+        with:
+          # La versión que exige `engines` en package.json.
+          node-version: 20
+          cache: npm
+          cache-dependency-path: eutask-cli/package-lock.json
+
+      # `ci` y no `install`: instala exactamente lo que fija el lockfile y falla si no cuadra.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Las pruebas de extremo a extremo compilan a `dist/` antes de lanzar el binario, así que
+      # esto también verifica que el paquete se construye.
+      - run: npm test

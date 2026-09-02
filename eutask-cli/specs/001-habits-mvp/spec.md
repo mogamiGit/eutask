@@ -174,4 +174,12 @@ Desarrolladores con soltura en la terminal, que trabajan a diario en ella y
 
 ## Dudas abiertas
 
-Ninguna. Las seis dudas iniciales se resolvieron en la clarificación.
+Ninguna. Las seis dudas iniciales se resolvieron en la clarificación, y la que quedó abierta en
+T14 se cerró en T17:
+
+- **`done` y `undone` se quedan como dos comandos paralelos.** Comparten estructura y solo difieren
+  en la función del núcleo, la bandera de no-op y los dos mensajes, pero unificarlas obliga a
+  normalizar `alreadyMarked` y `wasNotMarked` y a encajar `wasNotMarkedToday`, que no lleva racha.
+  La abstracción tendría exactamente dos usuarios y no crecerá: `rename` y `remove` no entran en
+  ese molde. Dos funciones que se leen de un vistazo pesan menos que una de orden superior con
+  tres parámetros de función.
