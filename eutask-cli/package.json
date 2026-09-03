@@ -1,0 +1,32 @@
+{
+  "name": "eutask-cli",
+  "version": "0.1.0",
+  "description": "CLI para crear y registrar hábitos y calcular rachas de días consecutivos",
+  "type": "module",
+  "bin": {
+    "eutask": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "date-fns": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
+  },
+  "private": true
+}
